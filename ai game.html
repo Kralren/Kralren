@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>✨ 星辰拾取者 · 接星星小游戏</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(145deg, #0a0f1e 0%, #1a1f33 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            padding: 16px;
+        }
+        .game-container {
+            background: rgba(10, 15, 30, 0.7);
+            backdrop-filter: blur(4px);
+            border-radius: 40px;
+            padding: 25px 25px 30px;
+            box-shadow: 0 25px 40px rgba(0, 0, 0, 0.6), 0 0 0 2px #3c4a6b inset;
+            border: 1px solid #7f92b0;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px 15px 10px;
+            color: #f3e9c0;
+            text-shadow: 0 0 8px #b9a56e;
+        }
+        .score-box {
+            background: #0b0e17;
+            border-radius: 60px;
+            padding: 10px 24px;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #ffdb7e;
+            box-shadow: inset 0 -3px 0 #4f3f1a, 0 8px 0 #0a0c14;
+            border-bottom: 2px solid #dbb44b;
+        }
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #1f253e;
+            padding: 8px 28px;
+            border-radius: 50px;
+            box-shadow: 0 6px 0 #0b0e1a;
+            border: 1px solid #7f8bb0;
+        }
+        .title span {
+            font-size: 32px;
+            filter: drop-shadow(0 0 6px gold);
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            border-radius: 32px;
+            background: radial-gradient(circle at 50% 30%, #26334d, #0e1322);
+            box-shadow: 0 20px 25px black, 0 0 0 4px #4b5a7a, 0 0 0 6px #1e263b;
+            cursor: none;  /* 隐藏默认鼠标，用滑板代替 */
+            touch-action: none; /* 禁止触摸滚动 */
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            margin-top: 25px;
+        }
+        .restart-btn {
+            background: #d9b650;
+            border: none;
+            color: #1a1f2b;
+            font-size: 24px;
+            font-weight: 800;
+            padding: 12px 40px;
+            border-radius: 60px;
+            letter-spacing: 1.5px;
+            box-shadow: 0 9px 0 #7d5d27, 0 4px 20px #ffd966;
+            transition: 0.07s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 2px solid #ffecb3;
+        }
+        .restart-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 3px 0 #7d5d27, 0 6px 18px #ffbf69;
+        }
+        .restart-btn span {
+            font-size: 28px;
+        }
+        .hint {
+            color: #a7b7dd;
+            font-size: 18px;
+            font-weight: 500;
+            background: #1f2740;
+            padding: 8px 28px;
+            border-radius: 40px;
+            border: 1px solid #62729e;
+            box-shadow: inset 0 2px 5px #040617;
+        }
+        .footer {
+            color: #8f9fc7;
+            margin-top: 15px;
+            font-size: 16px;
+            text-align: center;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="title">
+            <span></span> 星辰拾取者
+        </div>
+        <div class="score-box" id="scoreDisplay">0</div>
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+    <div class="controls">
+        <div class="hint">
+            ⬅️ 鼠标 / 手指 ➡️ 移动滑板
+        </div>
+        <button class="restart-btn" id="restartButton">
+            <span>🔄</span> 重新开始
+        </button>
+    </div>
+    <div class="footer">
+        接住金色的星星 ✦ 落地就结束 · 看你能接多少！
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ----- 画布与上下文 -----
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreSpan = document.getElementById('scoreDisplay');
+
+        // ----- 固定参数 -----
+        const W = 600, H = 400;
+        canvas.width = W;
+        canvas.height = H;
+
+        // 滑板设置
+        const PADDLE_WIDTH = 90;
+        const PADDLE_HEIGHT = 16;
+        const PADDLE_Y = H - 40;               // 滑板顶部Y坐标
+        const PADDLE_BOTTOM = PADDLE_Y + PADDLE_HEIGHT;
+
+        // 星星设置
+        const STAR_RADIUS = 10;
+        const FALL_SPEED = 2.5;                 // 每帧下落速度
+        const SPAWN_INTERVAL = 500;              // 毫秒
+
+        // ----- 全局变量 -----
+        let items = [];                          // 所有下落中的星星 { x, y, r, color }
+        let score = 0;
+        let gameActive = true;                   // true: 进行中, false: 游戏结束
+        let paddleX = (W - PADDLE_WIDTH) / 2;     // 滑板左边界, 初始居中
+
+        // 时间控制 (生成星星)
+        let lastSpawnTime = performance.now();
+
+        // 动画帧ID
+        let animFrame = null;
+
+        // ----- 辅助函数 更新分数显示 -----
+        function updateScoreDisplay() {
+            scoreSpan.textContent = score;
+        }
+
+        // ----- 重置游戏至初始状态 -----
+        function resetGame() {
+            gameActive = true;
+            items = [];                           // 清空所有星星
+            score = 0;
+            updateScoreDisplay();
+            // 滑板居中
+            paddleX = (W - PADDLE_WIDTH) / 2;
+            // 重置生成计时器 (避免一重置就喷涌大量星星)
+            lastSpawnTime = performance.now();
+
+            // 不需要停止动画循环, 继续跑
+        }
+
+        // ----- 生成一颗新星星 (随机X, 固定半径, 金色) -----
+        function spawnStar() {
+            // 确保星星不超出左右边界
+            const minX = STAR_RADIUS;
+            const maxX = W - STAR_RADIUS;
+            const x = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
+            items.push({
+                x: x,
+                y: STAR_RADIUS,                   // 从顶部的半径位置出现，避免穿模
+                r: STAR_RADIUS,
+                color: `hsl(52, 100%, 65%)`,       // 温暖的金色
+                // 加一点小高光效果，后面画渐变用
+            });
+        }
+
+        // ----- 更新游戏逻辑 (位置移动, 碰撞, 结束检测) 只在 gameActive == true 时执行 -----
+        function updateGame(now) {
+            if (!gameActive) return;
+
+            // 1. 根据时间差生成星星 (保证即使卡顿也不会错过生成)
+            const timeSinceLastSpawn = now - lastSpawnTime;
+            if (timeSinceLastSpawn >= SPAWN_INTERVAL) {
+                // 为了防止卡顿时生成大量星星，最多生成 3 颗 (如果卡了2秒也只多生几个)
+                let spawnCount = Math.floor(timeSinceLastSpawn / SPAWN_INTERVAL);
+                spawnCount = Math.min(spawnCount, 4);  // 单次最多补4颗，避免瞬间爆炸
+                for (let i = 0; i < spawnCount; i++) {
+                    spawnStar();
+                }
+                // 更新最后生成时间 (每次加间隔，避免时间跳跃过大)
+                lastSpawnTime = lastSpawnTime + spawnCount * SPAWN_INTERVAL;
+            }
+
+            // 2. 移动所有星星 (下落)
+            for (let star of items) {
+                star.y += FALL_SPEED;
+            }
+
+            // 3. 碰撞检测 (滑板接住星星) —— 从后往前遍历，便于删除
+            for (let i = items.length - 1; i >= 0; i--) {
+                const s = items[i];
+                // 简单的矩形-圆碰撞检测 (包围盒)
+                const starLeft = s.x - s.r;
+                const starRight = s.x + s.r;
+                const starTop = s.y - s.r;
+                const starBottom = s.y + s.r;
+
+                const paddleLeft = paddleX;
+                const paddleRight = paddleX + PADDLE_WIDTH;
+                const paddleTop = PADDLE_Y;
+                const paddleBottom = PADDLE_BOTTOM;
+
+                // 如果两个矩形相交 (足够近似)
+                if (starRight > paddleLeft && starLeft < paddleRight &&
+                    starBottom > paddleTop && starTop < paddleBottom) {
+                    // 接住星星 ✦ 加分 并移除
+                    items.splice(i, 1);
+                    score += 1;
+                    updateScoreDisplay();
+                }
+            }
+
+            // 4. 落地检测 → 任何星星触及底部则游戏结束
+            for (let s of items) {
+                if (s.y + s.r >= H) {   // 星星底部碰到画布底边
+                    gameActive = false;
+                    break;               // 一旦有一个落地立刻结束
+                }
+            }
+
+            // (可选) 如果游戏结束了，可以在这里打断，但是保持items不变用于绘制
+        }
+
+        // ----- 绘制画面 (不管游戏是否活动都绘制当前状态) -----
+        function drawScene() {
+            ctx.clearRect(0, 0, W, H);
+
+            // ------- 深邃星空背景 (动态闪烁) -------
+            ctx.fillStyle = '#0a0f1e';
+            ctx.fillRect(0, 0, W, H);
+            // 画一些小星星 (静态背景)
+            ctx.fillStyle = '#fff9e6';
+            for (let i = 0; i < 50; i++) {
+                if (i % 2 === 0) continue; // 随机感
+                const sx = (i * 23) % W;
+                const sy = (i * 13) % H;
+                ctx.globalAlpha = 0.6 + 0.4 * Math.sin(Date.now() * 0.002 + i);
+                ctx.beginPath();
+                ctx.arc(sx, sy, 1.5, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+
+            // ------- 绘制所有星星 (带着光晕) -------
+            for (let s of items) {
+                // 外发光
+                ctx.shadowColor = '#ffe484';
+                ctx.shadowBlur = 18;
+                // 主星渐变
+                const gradient = ctx.createRadialGradient(s.x - 3, s.y - 3, 3, s.x, s.y, s.r + 4);
+                gradient.addColorStop(0, '#fff1b0');
+                gradient.addColorStop(0.7, '#f5b81b');
+                gradient.addColorStop(1, '#b57c10');
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r, 0, 2 * Math.PI);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                // 加上高光小点
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(s.x - 3, s.y - 3, 3, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ffffdd';
+                ctx.globalAlpha = 0.8;
+                ctx.fill();
+
+                // 重置阴影避免干扰后续
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+                ctx.globalAlpha = 1.0;
+            }
+
+            // ------- 滑板 (星辰接引者) -------
+            // 滑板阴影
+            ctx.shadowColor = '#b0c6ff';
+            ctx.shadowBlur = 20;
+            // 滑板主体
+            ctx.fillStyle = '#4ea1d3';
+            ctx.beginPath();
+            ctx.roundRect(paddleX, PADDLE_Y, PADDLE_WIDTH, PADDLE_HEIGHT, 12);
+            ctx.fill();
+            // 滑板发光边缘
+            ctx.shadowBlur = 30;
+            ctx.fillStyle = '#b3e4ff';
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.roundRect(paddleX - 2, PADDLE_Y - 2, PADDLE_WIDTH + 4, PADDLE_HEIGHT + 4, 14);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            // 滑板内装饰
+            ctx.shadowBlur = 8;
+            ctx.fillStyle = '#1670a0';
+            ctx.beginPath();
+            ctx.roundRect(paddleX + 8, PADDLE_Y + 3, PADDLE_WIDTH - 16, PADDLE_HEIGHT - 6, 6);
+            ctx.fill();
+            // 两侧小灯
+            ctx.fillStyle = '#fcd978';
+            ctx.shadowColor = '#ffd966';
+            ctx.beginPath();
+            ctx.arc(paddleX + 10, PADDLE_Y + PADDLE_HEIGHT/2, 5, 0, 2*Math.PI);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(paddleX + PADDLE_WIDTH - 10, PADDLE_Y + PADDLE_HEIGHT/2, 5, 0, 2*Math.PI);
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
+
+            // ------- 如果游戏结束, 显示半透明遮罩 + GAME OVER -------
+            if (!gameActive) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(0, 0, W, H);
+
+                ctx.font = 'bold 44px "Segoe UI", "Roboto", system-ui, sans-serif';
+                ctx.fillStyle = '#fae67c';
+                ctx.shadowColor = '#c98f1d';
+                ctx.shadowBlur = 20;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('✨ GAME OVER ✨', W/2, H/2 - 20);
+                ctx.font = '28px sans-serif';
+                ctx.fillStyle = '#ffdba5';
+                ctx.fillText('点击下方按钮', W/2, H/2 + 40);
+                ctx.shadowBlur = 0;
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // 添加 roundRect 辅助方法
+        CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+            if (w < 2 * r) r = w / 2;
+            if (h < 2 * r) r = h / 2;
+            this.moveTo(x + r, y);
+            this.lineTo(x + w - r, y);
+            this.quadraticCurveTo(x + w, y, x + w, y + r);
+            this.lineTo(x + w, y + h - r);
+            this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            this.lineTo(x + r, y + h);
+            this.quadraticCurveTo(x, y + h, x, y + h - r);
+            this.lineTo(x, y + r);
+            this.quadraticCurveTo(x, y, x + r, y);
+            return this;
+        };
+
+        // ----- 动画主循环 -----
+        function gameLoop(now) {
+            // 更新逻辑 (只有active才移动/生成/碰撞)
+            updateGame(now);
+
+            // 绘制当前状态
+            drawScene();
+
+            // 继续下一帧
+            animFrame = requestAnimationFrame(gameLoop);
+        }
+
+        // ----- 鼠标 / 触摸 控制滑板 (转换到canvas坐标系) -----
+        function handleMove(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;   // canvas物理像素与CSS比例
+
+            // 计算鼠标在 canvas 坐标系中的 X 坐标
+            let canvasX = (clientX - rect.left) * scaleX;
+            // 边界裁剪
+            canvasX = Math.min(Math.max(canvasX, 0), canvas.width);
+
+            // 计算滑板左边界 (中心对准鼠标)
+            let newPaddleLeft = canvasX - PADDLE_WIDTH / 2;
+            // 限制滑板不能超出画布左右
+            newPaddleLeft = Math.min(Math.max(newPaddleLeft, 0), canvas.width - PADDLE_WIDTH);
+            paddleX = newPaddleLeft;
+        }
+
+        // 鼠标移动
+        canvas.addEventListener('mousemove', (e) => {
+            e.preventDefault();  // 防止在canvas上拖动选中
+            handleMove(e.clientX, e.clientY);
+        });
+
+        // 触摸移动
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                const touch = e.touches[0];
+                handleMove(touch.clientX, touch.clientY);
+            }
+        }, { passive: false });
+
+        // 触摸开始也要更新一次位置(防止Android长按菜单)
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                const touch = e.touches[0];
+                handleMove(touch.clientX, touch.clientY);
+            }
+        }, { passive: false });
+
+        // 防止从canvas外移动进来没触发mousemove导致滑板瞬移 —— 不必太担心
+
+        // 鼠标离开canvas区域时不做任何事 (滑板停在最后位置)
+
+        // ----- 重新开始按钮 -----
+        document.getElementById('restartButton').addEventListener('click', () => {
+            resetGame();
+        });
+
+        // 为了防止触摸时页面滚动/缩放，对body也做简单处理
+        document.body.addEventListener('touchmove', (e) => {
+            if (e.target === canvas) return; // canvas已经处理
+        }, { passive: false });
+
+        // ----- 启动动画循环 -----
+        lastSpawnTime = performance.now();  // 初始基准时间
+        animFrame = requestAnimationFrame(gameLoop);
+
+        // 可选: 窗口失去焦点时依然运行，没事
+        // 清理动画 (但不是必须的，但为了最佳实践可以保留)
+        window.addEventListener('beforeunload', () => {
+            if (animFrame) {
+                cancelAnimationFrame(animFrame);
+            }
+        });
+    })();
+</script>
+</body>
+</html>
